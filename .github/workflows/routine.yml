@@ -1,0 +1,45 @@
+name: Sync Sleep & Routine to ICS
+
+on:
+  schedule:
+    # Every 3 hours (UTC), same as the Portfolio Sprint sync.
+    - cron: "30 */3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate routine.ics
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          # Routine Blocks database ID (an ID, not a secret; useless without the token).
+          ROUTINE_DATABASE_ID: ec89e6f99480437d91f1915e50983288
+        run: python notion2routine.py
+
+      - name: Commit updated routine feed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add routine.ics
+          if ! git diff --cached --quiet; then
+            git commit -m "Update routine calendar feed"
+            git pull --rebase
+            git push
+          else
+            echo "No changes to commit."
+          fi
